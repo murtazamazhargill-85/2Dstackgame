@@ -1,0 +1,85 @@
+
+#pragma once
+#include <SFML/Graphics.hpp>
+
+// ---------- Settings ----------
+const int   WINDOW_W      = 480;
+const int   WINDOW_H      = 700;
+const float BLOCK_HEIGHT  = 30;
+const float START_WIDTH   = 300;
+const float SLIDE_SPEED   = 5;    // sideways speed
+const float DROP_SPEED    = 10;   // falling speed
+const float DROP_HEIGHT   = 100;  // how high the block floats above the tower
+const int   VISIBLE_ROWS  = 12;   // after this many blocks, the screen scrolls
+
+// ---------- Game data ----------
+extern float towerX[1000];   // left edge of each placed block
+extern float towerW[1000];   // width of each placed block
+extern int   blockCount;     // number of placed blocks
+
+extern float curX;           // moving block: left edge
+extern float curW;           // moving block: width
+extern float curY;           // moving block: height above the tower
+extern float curSpeed;       // +5 = moving right, -5 = moving left
+
+extern bool isFalling;
+extern bool isGameOver;
+
+// ---------- Functions ----------
+void resetGame();                          // Person 2
+void updateGame();                         // Person 2
+void loadAssets();                         // Person 3
+void drawGame(sf::RenderWindow& window);   // Person 3
+Person 1: main.cpp (input and main loop)
+cpp
+#include "game.h"
+using namespace sf;
+
+bool spaceWasDown = false;   // stops one key press from dropping many blocks
+
+void handleInput(RenderWindow& window)
+{
+    // Close button
+    while (auto event = window.pollEvent())
+    {
+        if (event->is<Event::Closed>())
+            window.close();
+    }
+
+    // Escape = quit
+    if (Keyboard::isKeyPressed(Keyboard::Key::Escape))
+        window.close();
+
+    // R = restart
+    if (Keyboard::isKeyPressed(Keyboard::Key::R))
+        resetGame();
+
+    // Space = drop the block (only once per press)
+    if (Keyboard::isKeyPressed(Keyboard::Key::Space))
+    {
+        if (!spaceWasDown && !isGameOver && !isFalling)
+            isFalling = true;
+        spaceWasDown = true;
+    }
+    else
+    {
+        spaceWasDown = false;
+    }
+}
+
+int main()
+{
+    RenderWindow window(VideoMode({ WINDOW_W, WINDOW_H }), "Stack");
+    window.setFramerateLimit(60);
+
+    loadAssets();
+    resetGame();
+
+    while (window.isOpen())
+    {
+        handleInput(window);
+        updateGame();
+        drawGame(window);
+    }
+    return 0;
+}
