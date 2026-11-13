@@ -1,0 +1,229 @@
+#include <SFML/Graphics.hpp>
+#include <algorithm>
+#include <string>
+
+// Settings 
+const int   WINDOW_W = 480;
+const int   WINDOW_H = 700;
+const float BLOCK_HEIGHT = 30;
+const float START_WIDTH = 300;
+const float SLIDE_SPEED = 5;    // side par chalne speed
+const float DROP_SPEED = 10;   // neeche girne ki speed
+const float DROP_HEIGHT = 100;  // block tower se kitna oopar hawa mein rehta hai
+const int   VISIBLE_ROWS = 12;   // itne blocks ke baad screen scroll hoti hai
+
+//  Game data 
+extern float towerX[1000];   // har rakhe gaye block ka left kinara
+extern float towerW[1000];   // har rakhe gaye block ki chaurai
+extern int   blockCount;     // rakhe gaye blocks ki tadaad
+
+extern float curX;           // move karne wala block: left kinara
+extern float curW;           // move karne wala block: chaurai
+extern float curY;           // move karne wala block: tower se oonchai
+extern float curSpeed;       
+
+extern bool isFalling;
+extern bool isGameOver;
+
+
+
+
+void resetGame();
+void updateGame();
+void loadAssets();
+void drawGame(sf::RenderWindow& window);
+
+
+using namespace sf;
+
+bool spaceWasDown = false;   // ek key dabane se kai blocks girne se rokta hai
+
+void handleInput(RenderWindow& window)
+{
+    
+    while (auto event = window.pollEvent())
+    {
+        if (event->is<Event::Closed>())
+            window.close();
+    }
+
+    if (Keyboard::isKeyPressed(Keyboard::Key::Escape))
+        window.close();
+
+    
+    if (Keyboard::isKeyPressed(Keyboard::Key::R))
+        resetGame();
+
+    
+    if (Keyboard::isKeyPressed(Keyboard::Key::Space))
+    {
+        if (!spaceWasDown && !isGameOver && !isFalling)
+            isFalling = true;
+        spaceWasDown = true;
+    }
+    else
+    {
+        spaceWasDown = false;
+    }
+}
+
+int main()
+{
+    RenderWindow window(VideoMode({ WINDOW_W, WINDOW_H }), "Stack");
+    window.setFramerateLimit(60);
+
+    loadAssets();
+    resetGame();
+
+    while (window.isOpen())
+    {
+        handleInput(window);
+        updateGame();
+        drawGame(window);
+    }
+    return 0;
+}
+
+
+using namespace std;
+
+float towerX[1000];
+float towerW[1000];
+int   blockCount = 1;
+
+float curX = 0;
+float curW = START_WIDTH;
+float curY = DROP_HEIGHT;
+float curSpeed = SLIDE_SPEED;
+
+bool isFalling = false;
+bool isGameOver = false;
+
+void resetGame()
+{
+    // Pehla  block
+    towerX[0] = 90;
+    towerW[0] = START_WIDTH;
+    blockCount = 1;
+
+    // move karne wala block
+    curX = 0;
+    curW = START_WIDTH;
+    curY = DROP_HEIGHT;
+    curSpeed = SLIDE_SPEED;
+
+    isFalling = false;
+    isGameOver = false;
+}
+
+// Block ko left right hilata hai, deewaron se takra kar wapas mur jata hai
+void slideBlock()
+{
+    curX += curSpeed;
+
+    if (curX + curW >= WINDOW_W)
+        curSpeed = -SLIDE_SPEED;
+    if (curX <= 0)
+        curSpeed = SLIDE_SPEED;
+}
+
+// Jab girta hua block tower par lagta hai tab chalta hai
+void landBlock()
+{
+    curY = 0;
+    isFalling = false;
+
+    int top = blockCount - 1;   // jis block par hum utre
+
+    // Woh hissa jahan dono blocks aapas mein milte hain
+    float overlapStart = max(curX, towerX[top]);
+    float overlapEnd = min(curX + curW, towerX[top] + towerW[top]);
+
+    if (overlapEnd <= overlapStart)
+    {
+        isGameOver = true;   // koi overlap nahi = game over
+    }
+    else
+    {
+        // Sirf milne wala hissa naya block ban jata hai
+        towerX[blockCount] = overlapStart;
+        towerW[blockCount] = overlapEnd - overlapStart;
+
+        // Agla movement wala block oopar se shuru hota hai, same chaurai ke saath
+        curX = 0;
+        curW = towerW[blockCount];
+        curY = DROP_HEIGHT;
+        blockCount++;
+    }
+}
+
+void updateGame()
+{
+    if (!isGameOver && !isFalling)
+        slideBlock();
+
+    if (isFalling)
+    {
+        curY -= DROP_SPEED;
+        if (curY <= 0)
+            landBlock();
+    }
+}
+
+
+Font font;
+Color colors[3] = { Color(255, 100, 100), Color(100, 220, 120), Color(90, 170, 255) };
+
+void loadAssets()
+{
+    font.openFromFile("C:/Windows/Fonts/arial.ttf");
+}
+
+void drawGame(RenderWindow& window)
+{
+    // Jab tower oonchi ho jaye to view neeche scroll karo
+    int scroll = 0;
+    if (blockCount > VISIBLE_ROWS)
+        scroll = blockCount - VISIBLE_ROWS;
+
+    window.clear(Color(200, 230, 250));
+
+    // Rakhe gaye blocks
+    for (int i = 0; i < blockCount; i++)
+    {
+        float y = WINDOW_H - (i + 1 - scroll) * BLOCK_HEIGHT;
+
+        RectangleShape box({ towerW[i], BLOCK_HEIGHT });
+        box.setPosition({ towerX[i], y });
+        box.setFillColor(colors[i % 3]);
+        window.draw(box);
+    }
+
+    // movement  wala block
+    if (!isGameOver)
+    {
+        float y = WINDOW_H - (blockCount + 1 - scroll) * BLOCK_HEIGHT - curY;
+
+        RectangleShape box({ curW, BLOCK_HEIGHT });
+        box.setPosition({ curX, y });
+        box.setFillColor(colors[blockCount % 3]);
+        window.draw(box);
+    }
+
+    // Score
+    Text score(font, "Score: " + to_string(blockCount - 1), 30);
+    score.setFillColor(Color::Black);
+    score.setPosition({ 10, 10 });
+    window.draw(score);
+
+    // Game khatam hone ka message
+    if (isGameOver)
+    {
+        Text over(font, "GAME OVER - Press R", 36);
+        over.setFillColor(Color::Red);
+        over.setPosition({ 50, 250 });
+        window.draw(over);
+    }
+
+    window.display();
+}
