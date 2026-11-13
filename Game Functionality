@@ -1,0 +1,86 @@
+#include "game.h"
+#include <algorithm>
+using namespace std;
+
+float towerX[1000];
+float towerW[1000];
+int   blockCount = 1;
+
+float curX = 0;
+float curW = START_WIDTH;
+float curY = DROP_HEIGHT;
+float curSpeed = SLIDE_SPEED;
+
+bool isFalling = false;
+bool isGameOver = false;
+
+void resetGame()
+{
+    // The first (base) block
+    towerX[0] = 90;
+    towerW[0] = START_WIDTH;
+    blockCount = 1;
+
+    // The moving block
+    curX = 0;
+    curW = START_WIDTH;
+    curY = DROP_HEIGHT;
+    curSpeed = SLIDE_SPEED;
+
+    isFalling = false;
+    isGameOver = false;
+}
+
+// Moves the block left and right, bouncing off the walls
+void slideBlock()
+{
+    curX += curSpeed;
+
+    if (curX + curW >= WINDOW_W)
+        curSpeed = -SLIDE_SPEED;
+    if (curX <= 0)
+        curSpeed = SLIDE_SPEED;
+}
+
+// Called when the falling block lands on the tower
+void landBlock()
+{
+    curY = 0;
+    isFalling = false;
+
+    int top = blockCount - 1;   // the block we landed on
+
+    // The part where both blocks overlap
+    float overlapStart = max(curX, towerX[top]);
+    float overlapEnd   = min(curX + curW, towerX[top] + towerW[top]);
+
+    if (overlapEnd <= overlapStart)
+    {
+        isGameOver = true;   // no overlap = missed completely
+    }
+    else
+    {
+        // Keep only the overlapping part as the new block
+        towerX[blockCount] = overlapStart;
+        towerW[blockCount] = overlapEnd - overlapStart;
+
+        // Next moving block starts at the top, same width
+        curX = 0;
+        curW = towerW[blockCount];
+        curY = DROP_HEIGHT;
+        blockCount++;
+    }
+}
+
+void updateGame()
+{
+    if (!isGameOver && !isFalling)
+        slideBlock();
+
+    if (isFalling)
+    {
+        curY -= DROP_SPEED;
+        if (curY <= 0)
+            landBlock();
+    }
+}
