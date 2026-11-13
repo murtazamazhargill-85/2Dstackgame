@@ -1,0 +1,61 @@
+#include "game.h"
+#include <string>
+using namespace std;
+using namespace sf;
+
+Font font;
+Color colors[3] = { Color(255, 100, 100), Color(100, 220, 120), Color(90, 170, 255) };
+
+void loadAssets()
+{
+    font.openFromFile("C:/Windows/Fonts/arial.ttf");
+}
+
+void drawGame(RenderWindow& window)
+{
+    // Once the tower gets tall, scroll the view down
+    int scroll = 0;
+    if (blockCount > VISIBLE_ROWS)
+        scroll = blockCount - VISIBLE_ROWS;
+
+    window.clear(Color(200, 230, 250));
+
+    // Placed blocks
+    for (int i = 0; i < blockCount; i++)
+    {
+        float y = WINDOW_H - (i + 1 - scroll) * BLOCK_HEIGHT;
+
+        RectangleShape box({ towerW[i], BLOCK_HEIGHT });
+        box.setPosition({ towerX[i], y });
+        box.setFillColor(colors[i % 3]);
+        window.draw(box);
+    }
+
+    // Moving block
+    if (!isGameOver)
+    {
+        float y = WINDOW_H - (blockCount + 1 - scroll) * BLOCK_HEIGHT - curY;
+
+        RectangleShape box({ curW, BLOCK_HEIGHT });
+        box.setPosition({ curX, y });
+        box.setFillColor(colors[blockCount % 3]);
+        window.draw(box);
+    }
+
+    // Score
+    Text score(font, "Score: " + to_string(blockCount - 1), 30);
+    score.setFillColor(Color::Black);
+    score.setPosition({ 10, 10 });
+    window.draw(score);
+
+    // Game over message
+    if (isGameOver)
+    {
+        Text over(font, "GAME OVER - Press R", 36);
+        over.setFillColor(Color::Red);
+        over.setPosition({ 50, 250 });
+        window.draw(over);
+    }
+
+    window.display();
+}
