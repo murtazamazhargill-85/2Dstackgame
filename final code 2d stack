@@ -1,0 +1,837 @@
+\
+#include <SFML/Graphics.hpp>
+#include <SFML/Window.hpp>
+#include <SFML/System.hpp>
+#include <algorithm>
+#include <string>
+#include <vector>
+#include <fstream>
+#include <cmath>
+
+
+#include <SFML/Graphics.hpp>
+#include <algorithm>
+#include <string>
+
+// Settings 
+const int   WINDOW_W = 480;
+const int   WINDOW_H = 700;
+const float BLOCK_HEIGHT = 30;
+const float START_WIDTH = 300;
+const float SLIDE_SPEED = 5;    // side par chalne speed
+const float DROP_SPEED = 10;   // neeche girne ki speed
+const float DROP_HEIGHT = 100;  // block tower se kitna oopar hawa mein rehta hai
+const int   VISIBLE_ROWS = 12;   // itne blocks ke baad screen scroll hoti hai
+
+//  Game data 
+extern float towerX[1000];   // har rakhe gaye block ka left kinara
+extern float towerW[1000];   // har rakhe gaye block ki chaurai
+extern int   blockCount;     // rakhe gaye blocks ki tadaad
+
+extern float curX;           // move karne wala block: left kinara
+extern float curW;           // move karne wala block: chaurai
+extern float curY;           // move karne wala block: tower se oonchai
+extern float curSpeed;
+
+extern bool isFalling;
+extern bool isGameOver;
+
+
+
+
+void resetGame();
+void updateGame();
+void loadAssets();
+void drawGame(sf::RenderWindow& window);
+
+
+using namespace sf;
+
+bool spaceWasDown = false;   // ek key dabane se kai blocks girne se rokta hai
+
+void handleInput(RenderWindow& window)
+{
+
+    while (auto event = window.pollEvent())
+    {
+        if (event->is<Event::Closed>())
+            window.close();
+    }
+
+    if (Keyboard::isKeyPressed(Keyboard::Key::Escape))
+        window.close();
+
+
+    if (Keyboard::isKeyPressed(Keyboard::Key::R))
+        resetGame();
+
+
+    if (Keyboard::isKeyPressed(Keyboard::Key::Space))
+    {
+        if (!spaceWasDown && !isGameOver && !isFalling)
+            isFalling = true;
+        spaceWasDown = true;
+    }
+    else
+    {
+        spaceWasDown = false;
+    }
+}
+
+using namespace std;
+
+float towerX[1000];
+float towerW[1000];
+int   blockCount = 1;
+
+float curX = 0;
+float curW = START_WIDTH;
+float curY = DROP_HEIGHT;
+float curSpeed = SLIDE_SPEED;
+
+bool isFalling = false;
+bool isGameOver = false;
+
+void resetGame()
+{
+    // Pehla  block
+    towerX[0] = 90;
+    towerW[0] = START_WIDTH;
+    blockCount = 1;
+
+    // move karne wala block
+    curX = 0;
+    curW = START_WIDTH;
+    curY = DROP_HEIGHT;
+    curSpeed = SLIDE_SPEED;
+
+    isFalling = false;
+    isGameOver = false;
+}
+
+// Block ko left right hilata hai, deewaron se takra kar wapas mur jata hai
+void slideBlock()
+{
+    curX += curSpeed;
+
+    if (curX + curW >= WINDOW_W)
+        curSpeed = -SLIDE_SPEED;
+    if (curX <= 0)
+        curSpeed = SLIDE_SPEED;
+}
+
+// Jab girta hua block tower par lagta hai tab chalta hai
+void landBlock()
+{
+    curY = 0;
+    isFalling = false;
+
+    int top = blockCount - 1;   // jis block par hum utre
+
+    // Woh hissa jahan dono blocks aapas mein milte hain
+    float overlapStart = max(curX, towerX[top]);
+    float overlapEnd = min(curX + curW, towerX[top] + towerW[top]);
+
+    if (overlapEnd <= overlapStart)
+    {
+        isGameOver = true;   // koi overlap nahi = game over
+    }
+    else
+    {
+        // Sirf milne wala hissa naya block ban jata hai
+        towerX[blockCount] = overlapStart;
+        towerW[blockCount] = overlapEnd - overlapStart;
+
+        // Agla movement wala block oopar se shuru hota hai, same chaurai ke saath
+        curX = 0;
+        curW = towerW[blockCount];
+        curY = DROP_HEIGHT;
+        blockCount++;
+    }
+}
+
+void updateGame()
+{
+    if (!isGameOver && !isFalling)
+        slideBlock();
+
+    if (isFalling)
+    {
+        curY -= DROP_SPEED;
+        if (curY <= 0)
+            landBlock();
+    }
+}
+
+
+Font font;
+Color colors[3] = { Color(255, 100, 100), Color(100, 220, 120), Color(90, 170, 255) };
+
+void loadAssets()
+{
+    font.openFromFile("C:/Windows/Fonts/arial.ttf");
+}
+
+void drawGame(RenderWindow& window)
+{
+    // Jab tower oonchi ho jaye to view neeche scroll karo
+    int scroll = 0;
+    if (blockCount > VISIBLE_ROWS)
+        scroll = blockCount - VISIBLE_ROWS;
+
+    window.clear(Color(200, 230, 250));
+
+    // Rakhe gaye blocks
+    for (int i = 0; i < blockCount; i++)
+    {
+        float y = WINDOW_H - (i + 1 - scroll) * BLOCK_HEIGHT;
+
+        RectangleShape box({ towerW[i], BLOCK_HEIGHT });
+        box.setPosition({ towerX[i], y });
+        box.setFillColor(colors[i % 3]);
+        window.draw(box);
+    }
+
+    // movement  wala block
+    if (!isGameOver)
+    {
+        float y = WINDOW_H - (blockCount + 1 - scroll) * BLOCK_HEIGHT - curY;
+
+        RectangleShape box({ curW, BLOCK_HEIGHT });
+        box.setPosition({ curX, y });
+        box.setFillColor(colors[blockCount % 3]);
+        window.draw(box);
+    }
+
+    // Score
+    Text score(font, "Score: " + to_string(blockCount - 1), 30);
+    score.setFillColor(Color::Black);
+    score.setPosition({ 10, 10 });
+    window.draw(score);
+
+    // Game khatam hone ka message
+    if (isGameOver)
+    {
+        Text over(font, "GAME OVER - Press R", 36);
+        over.setFillColor(Color::Red);
+        over.setPosition({ 50, 250 });
+        window.draw(over);
+    }
+
+    window.display();
+}
+
+
+
+// ---------- Extra settings ----------
+const float PERFECT_TOLERANCE = 6.f;    // how close counts as a "perfect" drop
+const float PERFECT_GROW = 8.f;    // block grows by this on combo >= 3
+const int   BLOCKS_PER_LEVEL = 5;      // speed goes up every N blocks
+const float MAX_EXTRA_SPEED = 5.f;
+const char* const HIGHSCORE_FILE = "stack_highscore.txt";
+const char* const SCORES_FILE = "stack_scores.txt";
+
+// ---------- State ----------
+enum PlusState { PLUS_MENU, PLUS_PLAY, PLUS_PAUSED, PLUS_OVER };
+PlusState plusState = PLUS_MENU;
+
+int  plusScore = 0;
+int  bestScore = 0;
+int  comboCount = 0;
+int  maxCombo = 0;
+int  perfectCount = 0;
+bool bestLoaded = false;
+bool newBestFlag = false;
+bool resultSaved = false;
+unsigned long plusTick = 0;
+
+bool plusSpaceWas = false, plusRWas = false, plusPWas = false;
+
+struct PlusParticle {
+    float x, y, vx, vy, life, maxLife, size;
+    sf::Color color;
+};
+struct PlusDebris {
+    float x, y, w, vx, vy, life;
+    sf::Color color;
+};
+struct PlusFloatText {
+    std::string text;
+    float x, y, life;
+    sf::Color color;
+    unsigned int size;
+};
+
+std::vector<PlusParticle>  plusParticles;
+std::vector<PlusDebris>    plusDebris;
+std::vector<PlusFloatText> plusTexts;
+
+// ---------- Helpers ----------
+sf::Color plusHSV(float h, float s, float v)
+{
+    float c = v * s;
+    float x = c * (1.f - std::fabs(std::fmod(h / 60.f, 2.f) - 1.f));
+    float m = v - c;
+    float r = 0, g = 0, b = 0;
+    int i = ((int)(h / 60.f)) % 6;
+    switch (i)
+    {
+    case 0: r = c; g = x; b = 0; break;
+    case 1: r = x; g = c; b = 0; break;
+    case 2: r = 0; g = c; b = x; break;
+    case 3: r = 0; g = x; b = c; break;
+    case 4: r = x; g = 0; b = c; break;
+    default: r = c; g = 0; b = x; break;
+    }
+    return sf::Color((std::uint8_t)((r + m) * 255), (std::uint8_t)((g + m) * 255),
+        (std::uint8_t)((b + m) * 255));
+}
+
+sf::Color plusLerp(sf::Color a, sf::Color b, float t)
+{
+    if (t < 0) t = 0;
+    if (t > 1) t = 1;
+    return sf::Color((std::uint8_t)(a.r + (b.r - a.r) * t),
+        (std::uint8_t)(a.g + (b.g - a.g) * t),
+        (std::uint8_t)(a.b + (b.b - a.b) * t));
+}
+
+sf::Color plusShade(sf::Color c, float f, int alpha = 255)
+{
+    return sf::Color((std::uint8_t)std::min(255.f, c.r * f),
+        (std::uint8_t)std::min(255.f, c.g * f),
+        (std::uint8_t)std::min(255.f, c.b * f),
+        (std::uint8_t)alpha);
+}
+
+sf::Color plusBlockColor(int index)
+{
+    return plusHSV((float)((index * 17) % 360), 0.55f, 0.95f);
+}
+
+int plusScroll()
+{
+    return (blockCount > VISIBLE_ROWS) ? blockCount - VISIBLE_ROWS : 0;
+}
+
+void drawTextPlus(sf::RenderWindow& window, const std::string& str, unsigned int size,
+    float x, float y, sf::Color color, bool centered = true, bool shadow = true)
+{
+    sf::Text t(font, str, size);
+    if (centered)
+    {
+        sf::FloatRect b = t.getLocalBounds();
+        t.setOrigin({ b.position.x + b.size.x / 2.f, b.position.y + b.size.y / 2.f });
+    }
+    if (shadow)
+    {
+        t.setFillColor(sf::Color(0, 0, 0, (std::uint8_t)(color.a * 0.45f)));
+        t.setPosition({ x + 2.f, y + 2.f });
+        window.draw(t);
+    }
+    t.setFillColor(color);
+    t.setPosition({ x, y });
+    window.draw(t);
+}
+
+// ---------- High score ----------
+void loadBestScore()
+{
+    std::ifstream in(HIGHSCORE_FILE);
+    if (in) in >> bestScore;
+    if (bestScore < 0) bestScore = 0;
+    bestLoaded = true;
+}
+
+void saveBestScore()
+{
+    std::ofstream out(HIGHSCORE_FILE);
+    if (out) out << bestScore;
+}
+
+void saveScore()
+{
+    std::ofstream out(SCORES_FILE, std::ios::app);
+    if (out)
+        out << plusScore << '\n';
+}
+
+// ---------- Effects ----------
+void spawnBurst(float x, float y, int count, sf::Color color, float power = 3.f)
+{
+    for (int i = 0; i < count; i++)
+    {
+        PlusParticle p;
+        p.x = x; p.y = y;
+        float angle = (rand() % 360) * 3.14159f / 180.f;
+        float sp = (rand() % 100) / 100.f * power + 0.5f;
+        p.vx = std::cos(angle) * sp;
+        p.vy = std::sin(angle) * sp - 1.5f;
+        p.life = 30.f + (float)(rand() % 30);
+        p.maxLife = p.life;
+        p.size = 3.f + (float)(rand() % 4);
+        p.color = color;
+        plusParticles.push_back(p);
+    }
+}
+
+void spawnFloatText(const std::string& s, float x, float y, sf::Color c, unsigned int size = 28)
+{
+    PlusFloatText t;
+    t.text = s;
+    t.x = x;
+    t.y = y;
+    t.life = 60.f;
+    t.color = c;
+    t.size = size;
+    plusTexts.push_back(t);
+}
+
+void addDebrisPlus(float x, float y, float w, float vx, float life, sf::Color color)
+{
+    PlusDebris d;
+    d.x = x;
+    d.y = y;
+    d.w = w;
+    d.vx = vx;
+    d.vy = 0.f;
+    d.life = life;
+    d.color = color;
+    plusDebris.push_back(d);
+}
+
+void updateEffectsPlus()
+{
+    for (auto& p : plusParticles) { p.x += p.vx; p.y += p.vy; p.vy += 0.15f; p.life--; }
+    plusParticles.erase(std::remove_if(plusParticles.begin(), plusParticles.end(),
+        [](const PlusParticle& p) { return p.life <= 0; }), plusParticles.end());
+
+    for (auto& d : plusDebris) { d.x += d.vx; d.y += d.vy; d.vy += 0.6f; d.life--; }
+    plusDebris.erase(std::remove_if(plusDebris.begin(), plusDebris.end(),
+        [](const PlusDebris& d) { return d.life <= 0 || d.y > WINDOW_H + 50; }), plusDebris.end());
+
+    for (auto& t : plusTexts) { t.y -= 0.8f; t.life--; }
+    plusTexts.erase(std::remove_if(plusTexts.begin(), plusTexts.end(),
+        [](const PlusFloatText& t) { return t.life <= 0; }), plusTexts.end());
+}
+
+// ---------- Game flow ----------
+void resetPlus()
+{
+    plusScore = 0;
+    comboCount = 0;
+    maxCombo = 0;
+    perfectCount = 0;
+    newBestFlag = false;
+    resultSaved = false;
+    plusParticles.clear();
+    plusDebris.clear();
+    plusTexts.clear();
+}
+
+void handleInputPlus(sf::RenderWindow& window)
+{
+    bool fallingBefore = isFalling;
+
+    handleInput(window);   // original input (close, Esc, R, Space)
+
+    bool spaceNow = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space);
+    bool rNow = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::R);
+    bool pNow = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::P);
+
+    // Restart (original code already called resetGame on R)
+    if (rNow && !plusRWas)
+    {
+        resetGame();
+        resetPlus();
+        plusState = PLUS_PLAY;
+        isFalling = false;
+    }
+
+    // Pause toggle
+    if (pNow && !plusPWas)
+    {
+        if (plusState == PLUS_PLAY)        plusState = PLUS_PAUSED;
+        else if (plusState == PLUS_PAUSED) plusState = PLUS_PLAY;
+    }
+
+    // Start from menu
+    if (plusState == PLUS_MENU && spaceNow && !plusSpaceWas)
+    {
+        resetGame();
+        resetPlus();
+        plusState = PLUS_PLAY;
+    }
+
+    if (plusState == PLUS_MENU || plusState == PLUS_PAUSED)
+        isFalling = fallingBefore && plusState == PLUS_PAUSED;
+
+    plusSpaceWas = spaceNow;
+    plusRWas = rNow;
+    plusPWas = pNow;
+}
+
+void updateGamePlus()
+{
+    plusTick++;
+    if (!bestLoaded) loadBestScore();
+    updateEffectsPlus();
+
+    if (plusState != PLUS_PLAY) return;
+
+    // Speed ramps up with level
+    if (!isGameOver && !isFalling)
+    {
+        int level = (blockCount - 1) / BLOCKS_PER_LEVEL;
+        float extra = std::min(level * 0.5f, MAX_EXTRA_SPEED);
+        curX += (curSpeed > 0 ? extra : -extra);
+        if (curX < 0) curX = 0;
+        if (curX + curW > WINDOW_W) curX = WINDOW_W - curW;
+    }
+
+    // Capture state right before a possible landing
+    bool  landing = isFalling && !isGameOver && (curY - DROP_SPEED <= 0);
+    float pX = curX, pW = curW;
+    int   topIdx = blockCount - 1;
+    float tX = towerX[topIdx], tW = towerW[topIdx];
+    int   before = blockCount;
+
+    updateGame();   // original update
+
+    if (landing)
+    {
+        int scroll = plusScroll();
+        if (isGameOver)
+        {
+            // whole block falls away
+            float y = WINDOW_H - (before + 1 - scroll) * BLOCK_HEIGHT;
+            addDebrisPlus(pX, y, pW, (float)(rand() % 3 - 1) * 1.5f, 90.f, plusBlockColor(before));
+            comboCount = 0;
+        }
+        else if (blockCount > before)
+        {
+            int   idx = blockCount - 1;
+            bool  perfect = std::fabs(pX - tX) <= PERFECT_TOLERANCE;
+            float y = WINDOW_H - (idx + 1 - scroll) * BLOCK_HEIGHT;
+
+            if (perfect)
+            {
+                // snap exactly onto the block below
+                towerX[idx] = tX;
+                towerW[idx] = tW;
+                comboCount++;
+                perfectCount++;
+                if (comboCount > maxCombo) maxCombo = comboCount;
+
+                // reward: block grows back after 3 perfects in a row
+                if (comboCount >= 3)
+                {
+                    float g = std::min(PERFECT_GROW, START_WIDTH - towerW[idx]);
+                    if (g > 0)
+                    {
+                        towerX[idx] -= g / 2;
+                        towerW[idx] += g;
+                        if (towerX[idx] < 0) towerX[idx] = 0;
+                        if (towerX[idx] + towerW[idx] > WINDOW_W)
+                            towerX[idx] = WINDOW_W - towerW[idx];
+                    }
+                }
+                curW = towerW[idx];
+
+                plusScore += 1 + std::min(comboCount, 5);
+                spawnBurst(towerX[idx] + towerW[idx] / 2, y, 30, sf::Color(255, 215, 0), 4.f);
+                spawnFloatText(comboCount >= 2 ? "PERFECT x" + std::to_string(comboCount) : std::string("PERFECT!"),
+                    WINDOW_W / 2.f, y - 20, sf::Color(255, 220, 60));
+            }
+            else
+            {
+                comboCount = 0;
+                plusScore += 1;
+                float oS = towerX[idx], oE = towerX[idx] + towerW[idx];
+
+                // cut-off pieces fall down
+                if (pX < oS)
+                    addDebrisPlus(pX, y, oS - pX, -1.f, 80.f, plusBlockColor(idx));
+                if (pX + pW > oE)
+                    addDebrisPlus(oE, y, pX + pW - oE, 1.f, 80.f, plusBlockColor(idx));
+
+                spawnBurst(towerX[idx] + towerW[idx] / 2, y, 8, plusShade(plusBlockColor(idx), 1.2f), 2.f);
+            }
+        }
+    }
+
+    // Game over -> record the result
+    if (isGameOver && !resultSaved)
+    {
+        resultSaved = true;
+        plusState = PLUS_OVER;
+        saveScore();
+        if (plusScore > bestScore)
+        {
+            bestScore = plusScore;
+            newBestFlag = true;
+            saveBestScore();
+        }
+    }
+}
+
+// ---------- Drawing ----------
+void drawBackgroundPlus(sf::RenderWindow& window)
+{
+    float progress = std::min(plusScore / 80.f, 1.f);
+
+    sf::Color dayTop(120, 190, 255), dayBot(220, 240, 255);
+    sf::Color nightTop(10, 10, 40), nightBot(70, 40, 110);
+    sf::Color topC = plusLerp(dayTop, nightTop, progress);
+    sf::Color botC = plusLerp(dayBot, nightBot, progress);
+
+    sf::Vertex v[4];
+    v[0].position = sf::Vector2f(0.f, 0.f);                          v[0].color = topC;
+    v[1].position = sf::Vector2f((float)WINDOW_W, 0.f);              v[1].color = topC;
+    v[2].position = sf::Vector2f(0.f, (float)WINDOW_H);              v[2].color = botC;
+    v[3].position = sf::Vector2f((float)WINDOW_W, (float)WINDOW_H);  v[3].color = botC;
+    window.draw(v, 4, sf::PrimitiveType::TriangleStrip);
+
+    // stars fade in as you climb
+    if (progress > 0.25f)
+    {
+        float a = 255.f * (progress - 0.25f) / 0.75f;
+        for (int i = 0; i < 60; i++)
+        {
+            float sx = (float)((i * 97) % WINDOW_W);
+            float sy = (float)((i * 53) % (WINDOW_H - 100));
+            float tw = 0.6f + 0.4f * std::sin(plusTick * 0.05f + i);
+            sf::CircleShape star(1.f + (i % 3) * 0.5f);
+            star.setPosition({ sx, sy });
+            star.setFillColor(sf::Color(255, 255, 255, (std::uint8_t)(a * tw)));
+            window.draw(star);
+        }
+    }
+}
+
+void drawGridPlus(sf::RenderWindow& window)
+{
+    sf::Color minor(255, 255, 255, 40);
+    sf::Color major(255, 255, 255, 80);
+
+    // vertical lines
+    int col = 0;
+    for (float x = 0.f; x <= (float)WINDOW_W; x += BLOCK_HEIGHT, col++)
+    {
+        sf::Color c = (col % 4 == 0) ? major : minor;
+        sf::Vertex line[2];
+        line[0].position = sf::Vector2f(x, 0.f);
+        line[0].color = c;
+        line[1].position = sf::Vector2f(x, (float)WINDOW_H);
+        line[1].color = c;
+        window.draw(line, 2, sf::PrimitiveType::Lines);
+    }
+
+    // horizontal lines (aligned with block rows)
+    int row = 0;
+    for (float y = (float)WINDOW_H; y >= 0.f; y -= BLOCK_HEIGHT, row++)
+    {
+        sf::Color c = (row % 4 == 0) ? major : minor;
+        sf::Vertex line[2];
+        line[0].position = sf::Vector2f(0.f, y);
+        line[0].color = c;
+        line[1].position = sf::Vector2f((float)WINDOW_W, y);
+        line[1].color = c;
+        window.draw(line, 2, sf::PrimitiveType::Lines);
+    }
+}
+
+void drawBrickPlus(sf::RenderWindow& window, float x, float y, float w, float h,
+    sf::Color base, int alpha = 255)
+{
+    if (w <= 0) return;
+
+    sf::RectangleShape shadow({ w, h });
+    shadow.setPosition({ x + 4.f, y + 4.f });
+    shadow.setFillColor(sf::Color(0, 0, 0, (std::uint8_t)(70 * alpha / 255)));
+    window.draw(shadow);
+
+    sf::RectangleShape body({ w, h });
+    body.setPosition({ x, y });
+    body.setFillColor(plusShade(base, 1.0f, alpha));
+    window.draw(body);
+
+    sf::RectangleShape light({ w, 8.f });
+    light.setPosition({ x, y });
+    light.setFillColor(plusShade(base, 1.35f, alpha));
+    window.draw(light);
+
+    sf::RectangleShape dark({ w, 6.f });
+    dark.setPosition({ x, y + h - 6.f });
+    dark.setFillColor(plusShade(base, 0.7f, alpha));
+    window.draw(dark);
+
+    if (w > 30)
+    {
+        sf::RectangleShape shine({ std::min(w * 0.25f, 40.f), 3.f });
+        shine.setPosition({ x + 6.f, y + 12.f });
+        shine.setFillColor(sf::Color(255, 255, 255, (std::uint8_t)(90 * alpha / 255)));
+        window.draw(shine);
+    }
+
+    sf::RectangleShape outline({ w, h });
+    outline.setPosition({ x, y });
+    outline.setFillColor(sf::Color::Transparent);
+    outline.setOutlineThickness(-1.5f);
+    outline.setOutlineColor(plusShade(base, 0.5f, alpha));
+    window.draw(outline);
+}
+
+void drawHUDPlus(sf::RenderWindow& window)
+{
+    sf::RectangleShape bar({ (float)WINDOW_W, 70.f });
+    bar.setFillColor(sf::Color(0, 0, 0, 90));
+    window.draw(bar);
+
+    drawTextPlus(window, std::to_string(plusScore), 44, WINDOW_W / 2.f, 30.f, sf::Color::White);
+    drawTextPlus(window, "BEST " + std::to_string(bestScore), 18, 12.f, 10.f, sf::Color(255, 220, 120), false);
+    drawTextPlus(window, "LEVEL " + std::to_string((blockCount - 1) / BLOCKS_PER_LEVEL + 1),
+        18, 12.f, 38.f, sf::Color(200, 230, 255), false);
+
+    if (comboCount >= 2)
+    {
+        float pulse = 1.f + 0.1f * std::sin(plusTick * 0.3f);
+        drawTextPlus(window, "COMBO x" + std::to_string(comboCount), (unsigned int)(20 * pulse),
+            WINDOW_W - 80.f, 25.f, sf::Color(255, 200, 60));
+    }
+    drawTextPlus(window, "P: pause", 14, WINDOW_W - 70.f, 52.f, sf::Color(255, 255, 255, 170));
+}
+
+void drawOverlayPanelPlus(sf::RenderWindow& window)
+{
+    sf::RectangleShape dim({ (float)WINDOW_W, (float)WINDOW_H });
+    dim.setFillColor(sf::Color(0, 0, 0, 140));
+    window.draw(dim);
+}
+
+void drawGamePlus(sf::RenderWindow& window)
+{
+    int scroll = plusScroll();
+
+    drawBackgroundPlus(window);
+    drawGridPlus(window);
+
+    // placed blocks
+    for (int i = 0; i < blockCount; i++)
+    {
+        float y = WINDOW_H - (i + 1 - scroll) * BLOCK_HEIGHT;
+        if (y > WINDOW_H) continue;
+        drawBrickPlus(window, towerX[i], y, towerW[i], BLOCK_HEIGHT, plusBlockColor(i));
+    }
+
+    // moving block + landing guide
+    if (!isGameOver && plusState != PLUS_MENU)
+    {
+        float targetY = WINDOW_H - (blockCount + 1 - scroll) * BLOCK_HEIGHT;
+
+        sf::RectangleShape ghost({ curW, BLOCK_HEIGHT });
+        ghost.setPosition({ curX, targetY });
+        ghost.setFillColor(sf::Color(255, 255, 255, 25));
+        ghost.setOutlineThickness(-1.5f);
+        ghost.setOutlineColor(sf::Color(255, 255, 255, 120));
+        window.draw(ghost);
+
+        float y = targetY - curY;
+        drawBrickPlus(window, curX, y, curW, BLOCK_HEIGHT, plusBlockColor(blockCount));
+    }
+
+    // falling debris
+    for (auto& d : plusDebris)
+    {
+        int a = (int)std::min(255.f, d.life * 4.f);
+        drawBrickPlus(window, d.x, d.y, d.w, BLOCK_HEIGHT, d.color, a);
+    }
+
+    // particles
+    for (auto& p : plusParticles)
+    {
+        sf::RectangleShape r({ p.size, p.size });
+        r.setPosition({ p.x, p.y });
+        sf::Color c = p.color;
+        c.a = (std::uint8_t)(255.f * p.life / p.maxLife);
+        r.setFillColor(c);
+        window.draw(r);
+    }
+
+    // floating texts
+    for (auto& t : plusTexts)
+    {
+        sf::Color c = t.color;
+        c.a = (std::uint8_t)(255.f * std::min(1.f, t.life / 30.f));
+        drawTextPlus(window, t.text, t.size, t.x, t.y, c);
+    }
+
+    drawHUDPlus(window);
+
+    // ---- Menu ----
+    if (plusState == PLUS_MENU)
+    {
+        drawOverlayPanelPlus(window);
+        float bob = std::sin(plusTick * 0.08f) * 6.f;
+        drawTextPlus(window, "STACK", 72, WINDOW_W / 2.f, 200.f + bob, sf::Color(255, 230, 120));
+        drawTextPlus(window, "Press SPACE to start", 28, WINDOW_W / 2.f, 320.f, sf::Color::White);
+        drawTextPlus(window, "SPACE  drop block", 18, WINDOW_W / 2.f, 400.f, sf::Color(220, 220, 220));
+        drawTextPlus(window, "P  pause     R  restart     ESC  quit", 18, WINDOW_W / 2.f, 430.f, sf::Color(220, 220, 220));
+        drawTextPlus(window, "Land perfectly for combos!", 18, WINDOW_W / 2.f, 470.f, sf::Color(255, 200, 60));
+        drawTextPlus(window, "BEST: " + std::to_string(bestScore), 26, WINDOW_W / 2.f, 540.f, sf::Color(255, 220, 120));
+    }
+
+    // ---- Pause ----
+    if (plusState == PLUS_PAUSED)
+    {
+        drawOverlayPanelPlus(window);
+        drawTextPlus(window, "PAUSED", 56, WINDOW_W / 2.f, 300.f, sf::Color::White);
+        drawTextPlus(window, "Press P to resume", 22, WINDOW_W / 2.f, 360.f, sf::Color(220, 220, 220));
+    }
+
+    // ---- Game over ----
+    if (plusState == PLUS_OVER)
+    {
+        drawOverlayPanelPlus(window);
+
+        sf::RectangleShape panel({ 340.f, 300.f });
+        panel.setOrigin({ 170.f, 150.f });
+        panel.setPosition({ WINDOW_W / 2.f, 330.f });
+        panel.setFillColor(sf::Color(25, 25, 50, 230));
+        panel.setOutlineThickness(3.f);
+        panel.setOutlineColor(sf::Color(255, 215, 0));
+        window.draw(panel);
+
+        drawTextPlus(window, "GAME OVER", 44, WINDOW_W / 2.f, 220.f, sf::Color(255, 90, 90));
+        drawTextPlus(window, "Score: " + std::to_string(plusScore), 30, WINDOW_W / 2.f, 280.f, sf::Color::White);
+        drawTextPlus(window, "Best: " + std::to_string(bestScore), 26, WINDOW_W / 2.f, 320.f, sf::Color(255, 220, 120));
+        drawTextPlus(window, "Perfect drops: " + std::to_string(perfectCount), 20, WINDOW_W / 2.f, 360.f, sf::Color(200, 230, 255));
+        drawTextPlus(window, "Best combo: x" + std::to_string(maxCombo), 20, WINDOW_W / 2.f, 388.f, sf::Color(200, 230, 255));
+
+        if (newBestFlag)
+        {
+            float pulse = 1.f + 0.08f * std::sin(plusTick * 0.25f);
+            drawTextPlus(window, "NEW HIGH SCORE!", (unsigned int)(26 * pulse), WINDOW_W / 2.f, 435.f, sf::Color(255, 215, 0));
+        }
+        drawTextPlus(window, "Press R to play again", 20, WINDOW_W / 2.f, 475.f, sf::Color::White);
+    }
+
+    window.display();
+}
+
+int main()
+{
+    sf::RenderWindow window(sf::VideoMode({ (unsigned int)WINDOW_W, (unsigned int)WINDOW_H }), "Stack Plus");
+    window.setFramerateLimit(60);
+
+    loadAssets();
+    resetGame();
+
+    while (window.isOpen())
+    {
+        handleInputPlus(window);
+        updateGamePlus();
+        drawGamePlus(window);
+    }
+    return 0;
+}
