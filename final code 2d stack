@@ -10,7 +10,6 @@
 using namespace sf;
 using namespace std;
 
-// ---------- File Names (5+ File Handling Files) ----------
 const char* const SETTINGS_FILE = "stack_settings.txt";   // 1. Settings file
 const char* const THEME_FILE = "stack_theme.txt";      // 2. Theme colors file
 const char* const STATS_FILE = "stack_stats.txt";      // 3. Lifetime stats file
@@ -19,7 +18,7 @@ const char* const GAMELOG_FILE = "stack_log.txt";        // 5. Event log file
 const char* const HIGHSCORE_FILE = "stack_highscore.txt";  // Existing high score file
 const char* const SCORES_FILE = "stack_scores.txt";     // Existing score history file
 
-// ---------- Settings (Loaded from stack_settings.txt) ----------
+
 int   WINDOW_W = 480;
 int   WINDOW_H = 700;
 float BLOCK_HEIGHT = 30;
@@ -261,9 +260,7 @@ void saveScore()
         out << plusScore << '\n';
 }
 
-// =========================================================================
-// CORE GAME FUNCTIONS (MODIFIED TO USE FILE HANDLING)
-// =========================================================================
+
 
 void loadAssets()
 {
@@ -365,9 +362,7 @@ void handleInput(RenderWindow& window)
     }
 }
 
-// =========================================================================
-// HELPERS & EFFECTS
-// =========================================================================
+
 
 sf::Color plusHSV(float h, float s, float v)
 {
@@ -494,9 +489,6 @@ void updateEffectsPlus()
         [](const PlusFloatText& t) { return t.life <= 0; }), plusTexts.end());
 }
 
-// =========================================================================
-// PLUS GAME FLOW
-// =========================================================================
 
 void resetPlus()
 {
@@ -679,9 +671,7 @@ void updateGamePlus()
     }
 }
 
-// =========================================================================
-// DRAWING FUNCTIONS
-// =========================================================================
+
 
 void drawBackgroundPlus(sf::RenderWindow& window)
 {
